@@ -1,6 +1,3 @@
-//Author      : Alex Zhang (cgzhangwei@gmail.com)
-//Date        : May 26. 2014
-//Description : Test vector to verify float point arithmetic
 module test;
 reg clk;
 reg resetn;
@@ -71,7 +68,7 @@ task  drive_sim;
     @(start_sim_evt);
     @(posedge clk);
     //        0    1     2   3    4    5    6     7
-    //Same exp, no overflow, unsigned A,B, Add
+    //Same exp, overflow, unsigned A,B, Add
     //12.5 + 8.5 = 21
     rA = 32'b0100_0001_0100_1000_0000_0000_0000_0000;
     rB = 32'b0100_0001_0000_1000_0000_0000_0000_0000;
@@ -80,26 +77,32 @@ task  drive_sim;
     rA = 0;
     rB = 0;
     rOp = 2'b00;
-    //Same exp, overflow, unsigned A,B, Add
-    //@(posedge clk);
-    //rA = 32'b0100_0001_0101_0000_0000_0000_0000_0000;
-    //rB = 32'b0100_0001_0101_0000_0000_0000_0000_0000;
-    //rOp = 2'b0;
     //Different exp A>B, unsigned A,B, Add 
     //@(posedge clk);
-    //rA = 32'b0100_0010_0101_0000_0000_0000_0000_0000;
-    //rB = 32'b0100_0001_0101_0000_0000_0000_0000_0000;
-    //rOp = 2'b0;
-    //Different exp, A<B, unsigned A,B, Add
+
+    //rA=832, rB=10, 
+    //Test the large different float point value
+    repeat (5) @(posedge clk);
+    rA = 32'b0100_0100_0101_0000_0000_0000_0000_0000;
+    rB = 32'b0100_0001_0010_0000_0000_0000_0000_0000;
+    rOp = 2'b10;
+    @(posedge clk);
+    rA = 0;
+    rB = 0;
+    rOp=2'b00;
+
+
+    //Different exp, A<B, signed A,B, Add
     //@(posedge clk);
     //rA = 32'b0100_0001_0101_0000_0000_0000_0000_0000;
     //rB = 32'b0100_0010_0101_0000_0000_0000_0000_0000;
-    //rA=1.75, rB=1.3125 
-    //rA+rB=3.0625  Exp=1, Binary(1+Fraction)=1.10001
+    //rA=1.75, rB=-1.3125 
+    //rA+rB=1.75-1.3125=0.4375
     repeat (5) @(posedge clk);
     rA = 32'b0011_1111_1110_0000_0000_0000_0000_0000;
-    rB = 32'b0011_1111_1010_1000_0000_0000_0000_0000;
+    rB = 32'b1011_1111_1010_1000_0000_0000_0000_0000;
     rOp = 2'b01; //Add is 01
+
     @(posedge clk);
     rA = 0;
     rB = 0;

@@ -9,3 +9,8 @@
    Camel notation : dataProcess or data_process
    Pascal notation : DataProcess
    Pascal acronym notation : DP_Function()
+
+2. Verification 
+   2.a Unsigned float point add with same exponent.
+   2.b Unsigned float point add with different exponent (>23).
+   2.c Signed float point add which changing to substract. 
