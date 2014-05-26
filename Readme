@@ -1,0 +1,11 @@
+1. Naming style
+   1.a wire variable is prefix with w*. (Hungarian notation)
+   1.b reg variable is prefix with r*. (Hungarian notation)
+   1.c pipeline variable is prefix with A_B_pp*, A is the previous stage name; while B is the next stage name.(Hungarian notation for pipeline+Camel notation)
+   1.d variable is general [w|r]AbcDef (Hungarian notation + Pascal notation), but it might be longer, use the abbrevationn: wAD_Ghi since wADGhi is something confusing, A is abbr. of Abc D is abbr. of Def. Ghi is orignal name. (Pascal acronym_Pascal notation)
+   1.e module define is with module rounding_hardware() ; endmodule  (Camel notation)
+   1.f module instant is with rounding_hardware RHW_0 (Pascal acronym notation_number )
+   Hungarian notation: m_dataProcess or mDataProcess. 
+   Camel notation : dataProcess or data_process
+   Pascal notation : DataProcess
+   Pascal acronym notation : DP_Function()
