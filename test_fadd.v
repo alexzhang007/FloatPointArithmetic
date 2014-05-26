@@ -1,3 +1,6 @@
+//Author      : Alex Zhang (cgzhangwei@gmail.com)
+//Date        : May 26. 2014
+//Description : Test vector to verify float point arithmetic
 module test;
 reg clk;
 reg resetn;
