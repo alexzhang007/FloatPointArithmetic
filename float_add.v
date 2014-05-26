@@ -1,18 +1,18 @@
 //Author      : Alex Zhang (cgzhangwei@gmail.com)
 //Date        : May.21.2014
-//Description : Float-point signed addtion implementation with Figure 3.17, extening a little to support signed. 
-//  Sign  Exponent  Fraction 
+//Description : Float-point signed addtion implementation with Figure 3.17, extening a little to support signed.
+//  Sign  Exponent  Fraction
 //  31    30-23     22-0
 //        exp-127
 //  Value = (-1)^S*(1+Fraction)*2^(exp-127)
-//  1. We need to change the exponent of smaller one to the bigger 
+//  1. We need to change the exponent of smaller one to the bigger
 module float_point_add(
 clk,
 resetn,
 iA,
 iB,
 iOp,
-oF, 
+oF,
 oDone
 );
 input clk;
@@ -28,7 +28,7 @@ wire [1:0]  iOp;
 reg  [31:0] oF;
 reg         oDone;
 
-//Declartion of connection 
+//Declartion of connection
 wire        wSelA;
 wire        wSelB;
 wire        wSelC;
@@ -47,7 +47,7 @@ wire [22:0] wLargeFraction;
 wire [22:0] wSRSmallFraction;
 wire [23:0] wZ_BHA;
 wire [7:0]  wMuxD;
-wire [22:0] wMuxE;
+wire [23:0] wMuxE;
 wire [23:0] wShf;
 wire [7:0]  wExp;
 wire [7:0]  wRH_Exp;
@@ -58,14 +58,14 @@ wire        wSign;
 wire        wFSign;
 wire        wDone;
 
-always @(posedge clk or negedge resetn) begin 
-    if (~resetn) begin 
+always @(posedge clk or negedge resetn) begin
+    if (~resetn) begin
         ppA  <= 32'b0;
         ppB  <= 32'b0;
-    end  else begin 
+    end  else begin
         ppA  <= iA;
         ppB  <= iB;
-    end 
+    end
 end
 
 mux_2 #(.DATA_WIDTH(8)) muxTwoA(
@@ -114,14 +114,14 @@ mux_2 #(.DATA_WIDTH(23)) muxTwoC(
   .iSel(wSelC),
   .oMux(wLargeFraction)
 );
-//FIXME, it might cannot be written like this, verilog shift operator should have constant in the RHS. We will use the clk here for shift. 
-//It can be synthesizable, but it will cost a lot of resource. 
-//wShiftR should be 23 enough. 
+//FIXME, it might cannot be written like this, verilog shift operator should have constant in the RHS. We will use the clk here for shift.
+//It can be synthesizable, but it will cost a lot of resource.
+//wShiftR should be 23 enough.
 //case(wShiftR) :
 //     5'b0:
 //     5'b1:
 //     ..
-//     5'b10111: 
+//     5'b10111:
 assign wSRSmallFraction = wSmallFraction >> wShiftR;
 
 big_half_add big_ha(
@@ -172,22 +172,22 @@ rounding_hardware round_hw(
   .oRoundFraction(wRH_Fraction),
   .oDone(wDone)
 );
-always @(posedge clk or negedge resetn) begin 
-    if (~resetn) 
+always @(posedge clk or negedge resetn) begin
+    if (~resetn)
         oF <= 32'b0;
-    else begin 
-        if (wDone) begin 
+    else begin
+        if (wDone) begin
            oF    <= {wFSign, wRH_Exp, wRH_Fraction[22:0]};
            oDone <= 1'b1;
-        end else begin 
+        end else begin
            oF    <= 32'b0;
            oDone <= 1'b0;
         end
-    end 
-end 
-endmodule 
+    end
+end
+endmodule
 
-//small_alu only performance the substract. 
+//small_alu only performance the substract.
 module small_alu(
 iA,
 iB,
@@ -202,15 +202,15 @@ wire [7:0] iA;
 wire [7:0] iB;
 reg  [7:0] oZ;
 reg        oCout;
-always @(iA or iB) begin 
-     if(iA >= iB) begin 
+always @(iA or iB) begin
+     if(iA >= iB) begin
          oZ = iA - iB;
          oCout = 1'b0;
-     end else begin 
+     end else begin
          oZ = iB -iA;
          oCout = 1'b1;
      end
-end 
+end
 
 endmodule //small_alu
 
@@ -268,105 +268,105 @@ reg         oRH_RoundExp;
 reg         oRH_RoundFra;
 reg         oRound;
 
-always @(*) begin 
+always @(*) begin
      oBLA         = iRelate ? 1'b1 : 1'b0 ;
      oRH_RoundExp = 1'b0;
      oRH_RoundFra = 1'b0;
-end 
-always @(*) begin 
+end
+always @(*) begin
      case ({iFpSignA, iOp, iFpSignB})
-         4'b0010  :  begin 
+         4'b0010  :  begin
                          //A+B
-                         oSign      = 1'b0; 
-                         oOp        = 2'b01;  
-                         oShiftR    = iExpDiff >23 ? 23: iExpDiff ;  
+                         oSign      = 1'b0;
+                         oOp        = 2'b01;
+                         oShiftR    = iExpDiff >23 ? 23: iExpDiff ;
                          oSelB      = iRelate ? 1'b0 : 1'b1 ;
-                         oSelC      = iRelate ? 1'b1 : 1'b0; 
-                         oExpIorD   = iNeedShift ? 2'b10 : 2'b00 ; //Add will only have incr. 
+                         oSelC      = iRelate ? 1'b1 : 1'b0;
+                         oExpIorD   = iNeedShift ? 2'b10 : 2'b00 ; //Add will only have incr.
                          oShiftLorR = iNeedShift ? 2'b10 : 2'b00 ; //Add will only have shift right.
                          oRound     = 1'b1;
-                     end 
-         4'b0011  :  begin 
+                     end
+         4'b0011  :  begin
                          //A+(-B)
-                         //if A>B (iRelate=0), sign=1'b0 else sign=1'b1; 
-                         oSign      = iRelate ? 1'b1 : 1'b0;   //A+(-B), 
+                         //if A>B (iRelate=0), sign=1'b0 else sign=1'b1;
+                         oSign      = iRelate ? 1'b1 : 1'b0;   //A+(-B),
                          oOp        = 2'b10;
-                         oShiftR    = iExpDiff >23 ? 23: iExpDiff ;  
+                         oShiftR    = iExpDiff >23 ? 23: iExpDiff ;
                          oSelB      = iRelate ? 1'b0 : 1'b1 ;
-                         oSelC      = iRelate ? 1'b1 : 1'b0; 
-                         oExpIorD   = iNeedShift ? 2'b01 : 2'b00 ; //Sub will only have decr. 
-                         oShiftLorR = iNeedShift ? 2'b11 : 2'b00 ; //Sub will cause the complement 
+                         oSelC      = iRelate ? 1'b1 : 1'b0;
+                         oExpIorD   = iNeedShift ? 2'b01 : 2'b00 ; //Sub will only have decr.
+                         oShiftLorR = iNeedShift ? 2'b11 : 2'b00 ; //Sub will cause the complement
                          oRound     = 1'b1;
-                     end 
+                     end
          4'b1010  :  begin
                          //-A+B = -(A-B)
-                         oSign      = iRelate ? 1'b0 : 1'b1; 
-                         oOp        = 2'b10;  
-                         oShiftR    = iExpDiff >23 ? 23: iExpDiff ;  
+                         oSign      = iRelate ? 1'b0 : 1'b1;
+                         oOp        = 2'b10;
+                         oShiftR    = iExpDiff >23 ? 23: iExpDiff ;
                          oSelB      = iRelate ? 1'b1 : 1'b0 ;
-                         oSelC      = iRelate ? 1'b0 : 1'b1; 
-                         oExpIorD   = iNeedShift ? 2'b01 : 2'b00 ; //Sub will only have decr. 
-                         oShiftLorR = iNeedShift ? 2'b11 : 2'b00 ; //Sub will cause the complement 
+                         oSelC      = iRelate ? 1'b0 : 1'b1;
+                         oExpIorD   = iNeedShift ? 2'b01 : 2'b00 ; //Sub will only have decr.
+                         oShiftLorR = iNeedShift ? 2'b11 : 2'b00 ; //Sub will cause the complement
                          oRound     = 1'b1;
-                     end 
-         4'b1011  :  begin 
+                     end
+         4'b1011  :  begin
                          //-A+(-B) =-(A+B)
-                         oSign      = 1'b1; 
-                         oOp        = 2'b01;  
-                         oShiftR    = iExpDiff >23 ? 23: iExpDiff ;  
+                         oSign      = 1'b1;
+                         oOp        = 2'b01;
+                         oShiftR    = iExpDiff >23 ? 23: iExpDiff ;
                          oSelB      = iRelate ? 1'b0 : 1'b1 ;
-                         oSelC      = iRelate ? 1'b1 : 1'b0; 
-                         oExpIorD   = iNeedShift ? 2'b10 : 2'b00 ; //Add will only have incr. 
+                         oSelC      = iRelate ? 1'b1 : 1'b0;
+                         oExpIorD   = iNeedShift ? 2'b10 : 2'b00 ; //Add will only have incr.
                          oShiftLorR = iNeedShift ? 2'b10 : 2'b00 ; //Add will only have shift right.
                          oRound     = 1'b1;
-                     end 
-         4'b0100  :  begin 
+                     end
+         4'b0100  :  begin
                          //A-B
-                         oSign      = iRelate ? 1'b1: 1'b0; 
-                         oOp        = 2'b10;  
-                         oShiftR    = iExpDiff >23 ? 23: iExpDiff ;  
+                         oSign      = iRelate ? 1'b1: 1'b0;
+                         oOp        = 2'b10;
+                         oShiftR    = iExpDiff >23 ? 23: iExpDiff ;
                          oSelB      = iRelate ? 1'b0 : 1'b1 ;
-                         oSelC      = iRelate ? 1'b1 : 1'b0; 
-                         oExpIorD   = iNeedShift ? 2'b01 : 2'b00 ; //Sub will only have decr. 
-                         oShiftLorR = iNeedShift ? 2'b11 : 2'b00 ; //Sub will cause the complement 
+                         oSelC      = iRelate ? 1'b1 : 1'b0;
+                         oExpIorD   = iNeedShift ? 2'b01 : 2'b00 ; //Sub will only have decr.
+                         oShiftLorR = iNeedShift ? 2'b11 : 2'b00 ; //Sub will cause the complement
                          oRound     = 1'b1;
-                     end 
-         4'b0101  :  begin 
+                     end
+         4'b0101  :  begin
                          //A-(-B)
                          oSign      = 1'b0;
-                         oOp        = 2'b01; 
-                         oShiftR    = iExpDiff >23 ? 23: iExpDiff ;  
+                         oOp        = 2'b01;
+                         oShiftR    = iExpDiff >23 ? 23: iExpDiff ;
                          oSelB      = iRelate ? 1'b0 : 1'b1 ;
-                         oSelC      = iRelate ? 1'b1 : 1'b0; 
-                         oExpIorD   = iNeedShift ? 2'b10 : 2'b00 ; //Add will only have incr. 
+                         oSelC      = iRelate ? 1'b1 : 1'b0;
+                         oExpIorD   = iNeedShift ? 2'b10 : 2'b00 ; //Add will only have incr.
                          oShiftLorR = iNeedShift ? 2'b10 : 2'b00 ; //Add will only have shift right.
                          oRound     = 1'b1;
-                     end 
-         4'b1100  :  begin 
+                     end
+         4'b1100  :  begin
                          //-A-B = -(A+B)
-                         oSign      = 1'b1; 
-                         oOp        = 2'b01;  
-                         oShiftR    = iExpDiff >23 ? 23: iExpDiff ;  
+                         oSign      = 1'b1;
+                         oOp        = 2'b01;
+                         oShiftR    = iExpDiff >23 ? 23: iExpDiff ;
                          oSelB      = iRelate ? 1'b0 : 1'b1 ;
-                         oSelC      = iRelate ? 1'b1 : 1'b0; 
-                         oExpIorD   = iNeedShift ? 2'b10 : 2'b00 ; //Add will only have incr. 
-                         oShiftLorR = iNeedShift ? 2'b11 : 2'b00 ; //Sub will cause the complement 
+                         oSelC      = iRelate ? 1'b1 : 1'b0;
+                         oExpIorD   = iNeedShift ? 2'b10 : 2'b00 ; //Add will only have incr.
+                         oShiftLorR = iNeedShift ? 2'b11 : 2'b00 ; //Sub will cause the complement
                          oRound     = 1'b1;
-                     end 
-         4'b1101  :  begin 
+                     end
+         4'b1101  :  begin
                          //-A-(-B) = -(A-B)
-                         //iRelate =0, A>=B, oSelC=0(select A) 
-                         oSign      = iRelate ? 1'b0 : 1'b1; 
-                         oOp        = 2'b10; 
-                         oShiftR    = iExpDiff >23 ? 23: iExpDiff ;  
+                         //iRelate =0, A>=B, oSelC=0(select A)
+                         oSign      = iRelate ? 1'b0 : 1'b1;
+                         oOp        = 2'b10;
+                         oShiftR    = iExpDiff >23 ? 23: iExpDiff ;
                          oSelB      = iRelate ? 1'b0 : 1'b1 ;
-                         oSelC      = iRelate ? 1'b1 : 1'b0; 
-                         oExpIorD   = iNeedShift ? 2'b01 : 2'b00 ; //Sub will only have decr. 
-                         oShiftLorR = iNeedShift ? 2'b11 : 2'b00 ; //Sub will cause the complement 
+                         oSelC      = iRelate ? 1'b1 : 1'b0;
+                         oExpIorD   = iNeedShift ? 2'b01 : 2'b00 ; //Sub will only have decr.
+                         oShiftLorR = iNeedShift ? 2'b11 : 2'b00 ; //Sub will cause the complement
                          oRound     = 1'b1;
-                     end 
-          //Way1. Need to add the default branch in the case, otherwise, the big_half_add will always be overflow. 
-          default  : begin 
+                     end
+          //Way1. Need to add the default branch in the case, otherwise, the big_half_add will always be overflow.
+          default  : begin
                          oSign      = 1'b0;
                          oOp        = 2'b00;
                          oShiftR    = 0;
@@ -376,10 +376,10 @@ always @(*) begin
                          oShiftLorR = 2'b00;
                          oRound     = 1'b0;
                      end
-     endcase 
-end 
+     endcase
+end
 
-endmodule //control 
+endmodule //control
 module exp_inc_dec (
 clk,
 resetn,
@@ -399,7 +399,7 @@ wire [7:0]  iExp;
 wire [1:0]  iExpIorD;
 reg  [7:0]  oExp;
 reg         oExpOverflow;
-always @(iExpIorD or iExp) begin 
+always @(iExpIorD or iExp) begin
      case (iExpIorD)
          2'b10 : //Incr
                {oExpOverflow, oExp} = iExp + 8'b1;
@@ -408,10 +408,10 @@ always @(iExpIorD or iExp) begin
          2'b00 : begin  //Keep
                  oExpOverflow = 1'b0;
                  oExp = iExp;
-                 end 
+                 end
      endcase
-end 
-endmodule 
+end
+endmodule
 module shift_left_right (
 iShf,
 iShfRR,
@@ -427,20 +427,20 @@ wire [23:0] iShf;
 wire        iShfRR;
 wire [1:0]  iShfLorR;
 reg  [23:0] oShf;
-always @(iShfLorR or iShf) begin 
-    case (iShfLorR) 
+always @(iShfLorR or iShf) begin
+    case (iShfLorR)
        2'b10 : //Shift Right
               oShf = {iShfRR, iShf[23:1]};
        2'b01 : //Shift Left
               oShf = {iShf[22:0], 1'b0};
        2'b00 :
               oShf = iShf;
-       2'b11 : 
+       2'b11 :
               oShf = ~iShf +1; //Complement +1
     endcase
-end  
+end
 
-endmodule 
+endmodule
 module big_half_add (
 iA,
 iB,
@@ -459,14 +459,14 @@ wire [1:0]  iOp;
 reg  [23:0] oZ;
 reg         oCout;
 
-always @(iA or iB or iOp) begin 
+always @(iA or iB or iOp) begin
     case (iOp)
         2'b01:  {oCout, oZ} = iA + iB; //Add
         2'b10:  {oCout, oZ} = iB - iA; //Sub
         2'b00:  begin oCout =0; oZ =24'b0; end //Nop Operation
-    endcase 
-end 
-endmodule 
+    endcase
+end
+endmodule
 module rounding_hardware (
 clk,
 resetn,
@@ -491,8 +491,8 @@ reg  [7:0]  oRoundExp;
 reg  [23:0] oRoundFraction;
 reg         oDone;
 reg         rMoved;
-//Actually, float point add or substraction is no need to rounding, only the multiply or division need rounding. 
-//shift left to meet the IEEE750. 
+//Actually, float point add or substraction is no need to rounding, only the multiply or division need rounding.
+//shift left to meet the IEEE750.
 //Need a state machine to determine the Rounding logic.
 parameter S_IDLE  = 3'b000;
 parameter S_MOVE  = 3'b001;
@@ -501,57 +501,57 @@ parameter S_DONE  = 3'b100;
 reg  [2:0] state;
 reg  [2:0] next_state;
 
-always @(posedge clk or negedge resetn) begin 
-    if (~resetn) 
+always @(posedge clk or negedge resetn) begin
+    if (~resetn)
         state <= S_IDLE;
     else
         state <= next_state;
-end 
-always @(*) begin 
+end
+always @(*) begin
     next_state = state;
-    case (state) 
-        S_IDLE : begin 
+    case (state)
+        S_IDLE : begin
                     if (iRound)
                         next_state = iFraction[23] ? S_DONE : S_ROUND;
-                 end 
-         S_ROUND:begin 
+                 end
+         S_ROUND:begin
                     if (oRoundFraction[22]==1'b1) //FIXME: need to detect the cycles
                         next_state = S_DONE;
-                    else 
-                        next_state = S_ROUND; 
-                 end 
-         S_DONE : begin 
+                    else
+                        next_state = S_ROUND;
+                 end
+         S_DONE : begin
                     next_state = S_IDLE;
-                  end 
+                  end
     endcase
-end 
+end
 
-always @(posedge clk or negedge resetn) begin 
-    if (~resetn) begin 
+always @(posedge clk or negedge resetn) begin
+    if (~resetn) begin
        oRoundExp      <= 8'b0;
        oRoundFraction <= 24'b0;
        oDone          <= 1'b0;
-    end else begin 
-        case (state) 
-            S_IDLE : begin 
+    end else begin
+        case (state)
+            S_IDLE : begin
                          oRoundExp      <= iExp;
                          oRoundFraction <= iFraction;
                          oDone          <= 1'b0;
-                     end  
-            S_ROUND: begin 
+                     end
+            S_ROUND: begin
                          oRoundFraction <= { oRoundFraction[22:0],1'b0} ;
                          oRoundExp      <= oRoundExp - 1;
                          oDone          <= 1'b0;
-                     end 
-            S_DONE : begin 
+                     end
+            S_DONE : begin
                          oDone          <= 1'b1;
                      end
-            default :begin 
+            default :begin
                          oRoundExp      <= 8'b0;
                          oRoundFraction <= 24'b0;
                          oDone          <= 1'b0;
                      end
-        endcase  
-    end 
-end 
-endmodule 
+        endcase
+    end
+end
+endmodule
