@@ -9,8 +9,16 @@
    Camel notation : dataProcess or data_process
    Pascal notation : DataProcess
    Pascal acronym notation : DP_Function()
-
 2. Verification 
    2.a Unsigned float point add with same exponent.
    2.b Unsigned float point add with different exponent (>23).
    2.c Signed float point add which changing to substract. 
+3. Features
+   3.a Float point add operation 
+       Status: RTL is done and verified. 
+       Description: Float point add cannot be pipelined since it needs time to 
+   3.b Float point multiply operation 
+       Status: RTL is done and not verified.
+   3.c Float point divide operation 
+       Status: RTL is not done and not verified. 
+       
