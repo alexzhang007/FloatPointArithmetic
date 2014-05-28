@@ -1,6 +1,8 @@
 //Author      : Alex Zhang (cgzhangwei@gmail.com)
 //Date        : May. 27. 2014
 //Description : Float point signed multiply implemetation with Figure 3.18
+//              May. 28. 2014
+//              Fix Bug1: Fraction multiply result should have 2 MSB to indicate the integer not 1MSB - 
 module float_point_multiply(
 clk,
 resetn,
@@ -20,6 +22,9 @@ reg  [31:0] oZ;
 wire        wSign;
 wire [7:0]  wExp;
 wire [47:0] wRH_Fraction;
+wire [7 :0] wRF_Exp;
+wire [22:0] wRF_Frac;
+wire        wOverflow;
 
 assign wSign = iA[31]^iB[31];
 
@@ -37,15 +42,53 @@ rhombus_24x24 fraction_multiply(
   .oZ(wRH_Fraction) 
 );
 
+shift_right rouding_faction(
+  .iFrac(wRH_Fraction),
+  .iExp(wExp),
+  .oFrac(wRF_Frac),
+  .oExp(wRF_Exp),
+  .oOverflow(wOverflow)
+);
+
 always @(posedge clk or negedge resetn) begin 
     if (~resetn) begin 
          oZ <= 32'b0;
     end else begin 
-         oZ <= {wSign, wExp, wRH_Fraction[46:24]};
+         oZ <= {wSign, wRF_Exp, wRF_Frac};
     end 
 end 
 
 endmodule //float_point_multiply
+module shift_right (
+iFrac,
+iExp,
+oFrac,
+oExp,
+oOverflow
+);
+input iFrac;
+input iExp;
+output oFrac;
+output oExp;
+output oOverflow;
+wire [47:0] iFrac;
+wire [7:0]  iExp;
+reg  [22:0] oFrac;
+reg  [7:0]  oExp;
+reg         oOverflow;
+always @(iFrac or iExp) begin 
+    if (iFrac[47]==1'b1) begin
+        oFrac = iFrac[46:24]; //always ignore the low 24bits.
+        {oOverflow, oExp}=iExp + 1;
+    end else begin 
+        oFrac = iFrac[45:23];
+        oExp  = iExp;
+        oOverflow = 1'b0;
+    end
+end 
+
+endmodule//shift_right
+
 module small_alu_add (
 iA,
 iB,
