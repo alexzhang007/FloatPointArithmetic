@@ -16,9 +16,9 @@
 3. Features
    3.a Float point add operation 
        Status: RTL is done and verified. 
-       Description: Float point add cannot be pipelined since it needs time to 
+       Description: Float point add cannot be pipelined since it needs time to shift. 
    3.b Float point multiply operation 
-       Status: RTL is done and not verified.
+       Status: RTL is done and verified and bugs are fixed (May.28.2014). Pipelined is achieved. 
    3.c Float point divide operation 
        Status: RTL is not done and not verified. 
        
