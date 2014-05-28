@@ -3,6 +3,7 @@
 //Description : Float point signed multiply implemetation with Figure 3.18
 //              May. 28. 2014
 //              Fix Bug1: Fraction multiply result should have 2 MSB to indicate the integer not 1MSB - 
+//              Fix Bug2: Fraction part is exponent part is misaligned
 module float_point_multiply(
 clk,
 resetn,
@@ -42,9 +43,43 @@ rhombus_24x24 fraction_multiply(
   .oZ(wRH_Fraction) 
 );
 
+reg [7:0]  ppExp;
+reg [7:0]  pp1Exp;
+reg [7:0]  pp2Exp;
+reg [7:0]  pp3Exp;
+reg        ppSign;
+reg        pp1Sign;
+reg        pp2Sign;
+reg        pp3Sign;
+reg        pp4Sign;
+
+always @(posedge clk or negedge resetn) begin 
+    if (~resetn) begin 
+        ppExp          <= 8'b0;
+        pp1Exp         <= 8'b0;
+        pp2Exp         <= 8'b0;
+        pp3Exp         <= 8'b0;
+        ppSign         <= 1'b0;
+        pp1Sign        <= 1'b0;
+        pp2Sign        <= 1'b0;
+        pp3Sign        <= 1'b0;
+        pp4Sign        <= 1'b0;
+    end else begin 
+        ppExp          <= wExp;
+        pp1Exp         <= ppExp;
+        pp2Exp         <= pp1Exp;
+        pp3Exp         <= pp2Exp;
+        ppSign         <= wSign;
+        pp1Sign        <= ppSign;
+        pp2Sign        <= pp1Sign;
+        pp3Sign        <= pp2Sign;
+        pp4Sign        <= pp3Sign;
+    end 
+end 
+
 shift_right rouding_faction(
   .iFrac(wRH_Fraction),
-  .iExp(wExp),
+  .iExp(pp3Exp),
   .oFrac(wRF_Frac),
   .oExp(wRF_Exp),
   .oOverflow(wOverflow)
@@ -54,7 +89,7 @@ always @(posedge clk or negedge resetn) begin
     if (~resetn) begin 
          oZ <= 32'b0;
     end else begin 
-         oZ <= {wSign, wRF_Exp, wRF_Frac};
+         oZ <= {pp4Sign, wRF_Exp, wRF_Frac};
     end 
 end 
 
