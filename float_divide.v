@@ -1,5 +1,5 @@
 //Author      : Alex Zhang (cgzhangwei@gmail.com)
-//Date        : May. 29. 2014
+//Date        : May. 27. 2014
 //Description : Float point signed division implemetation with Taylor Series: a/b
 //              Bug : The significand of 23 bits needs to be further improved.
 module float_point_divide(
@@ -98,7 +98,7 @@ float_point_multiply FP_B(
   .iA(ppB),
   .iB(wMuxCOut),
   .iValid(wValidFP_B),
-  .oDone(wDoneFB_B),
+  .oDone(wDoneFP_B),
   .oZ(wB_X_LUT)
 );
 

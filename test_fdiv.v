@@ -85,7 +85,7 @@ task  drive_sim;
     rA = 0;
     rB = 0;
     rValid = 1'b0;
-    #100;
+    repeat (100) @(posedge clk);
     ->end_sim_evt;
 endtask 
 
