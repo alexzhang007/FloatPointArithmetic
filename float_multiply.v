@@ -73,6 +73,12 @@ always @(posedge clk or negedge resetn) begin
         pp1Sign        <= 1'b0;
         pp2Sign        <= 1'b0;
         pp3Sign        <= 1'b0;
+        pp4Sign        <= 1'b0;
+        ppValid        <= 1'b0; 
+        pp1Valid       <= 1'b0;
+        pp2Valid       <= 1'b0;
+        pp3Valid       <= 1'b0;
+        pp4Valid       <= 1'b0;
         oDone          <= 1'b0;
     end else begin 
         ppExp          <= wExp;
