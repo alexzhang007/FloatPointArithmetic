@@ -4,6 +4,7 @@ reg resetn;
 reg [31:0] rA, rB;
 wire [31:0] wF;
 wire        wDone;
+reg         rValid;
 reg [1:0] rOp;
 event start_sim_evt;
 event end_sim_evt;
@@ -13,6 +14,8 @@ float_point_multiply  fp_mul(
   .resetn(resetn),
   .iA(rA),
   .iB(rB),
+  .iValid(rValid),
+  .oDone(wDone),
   .oZ(wF)
 );
 initial begin 
@@ -47,6 +50,7 @@ task reset_unit;
         rA=0;
         rB=0;
         rOp = 0;
+        rValid = 0;
         #10;   //Before Reset is done, the Bit should have its real value
         #20;
         resetn = 1;
@@ -64,12 +68,14 @@ task  drive_clock;
 endtask
 task  drive_sim;
     @(start_sim_evt);
+   
     @(posedge clk);
     //        0    1     2   3    4    5    6     7
     //Same exp, overflow, unsigned A,B, Add
     //12.5 * 8.5 = 106.25
     rA = 32'b0100_0001_0100_1000_0000_0000_0000_0000;
     rB = 32'b0100_0001_0000_1000_0000_0000_0000_0000;
+    rValid =1'b1;
     @(posedge clk);
     //Different exp, signed A,B
     //-50 * 8.5 = -425
@@ -78,6 +84,7 @@ task  drive_sim;
     @(posedge clk);
     rA = 0;
     rB = 0;
+    rValid = 1'b0;
     #100;
     ->end_sim_evt;
 endtask 

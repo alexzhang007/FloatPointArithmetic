@@ -21,4 +21,5 @@
        Status: RTL is done and verified and bugs are fixed (May.28.2014). Pipelined is achieved. 
    3.c Float point divide operation 
        Status: RTL is done (May.30.2014) and not verified. 
+       The architecture can be furthre modified only with one multiplier since its pipeline is full. 
        
