@@ -2,6 +2,7 @@
 //Date        : May. 27. 2014
 //Description : Float point signed division implemetation with Taylor Series: a/b
 //              Bug : The significand of 23 bits needs to be further improved.
+//              Fix Bug4 :FP_control was stuck in the S_IDLE when multiplier FP_A process only one time.
 module float_point_divide(
 clk,
 resetn,
@@ -190,8 +191,10 @@ always @(*) begin
                          next_state = S_PP_TWO;
                      else if (iDoneFP_A & iDoneFP_B && counter ==4'b10)
                          next_state = S_PP_THR;
-                     else if (iDoneFP_A & iDoneFP_B && counter ==4'b11)
+                     else if ((iDoneFP_A | iDoneFP_B) && counter ==4'b11)
                          next_state = S_DONE;
+                     else 
+                         next_state = S_IDLE;
                  end 
          S_PP_ONE: begin 
                       next_state = S_IDLE;
@@ -218,9 +221,10 @@ always @(posedge clk or negedge resetn) begin
         oDone      <= 1'b0;
         counter    <= 4'b0;
     end else begin 
+        //counter is to forward the state machine from one pipeline stage to the next
         if (iValid )
              counter <=4'b0;
-        else if (iDoneFP_A & iDoneFP_B)
+        else if (oValidFP_A | oValidFP_B)
              counter <= counter+4'b1; 
         case (state) 
             S_IDLE : begin 
