@@ -7,19 +7,24 @@
 module float_point_multiply(
 clk,
 resetn,
+iValid,
 iA,
 iB,
+oDone,
 oZ
 );
 
 input clk;
 input resetn;
+input iValid;
 input iA;
 input iB;
 output oZ;
+output oDone;
 wire [31:0] iA;
 wire [31:0] iB;
 reg  [31:0] oZ;
+reg         oDone;
 wire        wSign;
 wire [7:0]  wExp;
 wire [47:0] wRH_Fraction;
@@ -52,6 +57,11 @@ reg        pp1Sign;
 reg        pp2Sign;
 reg        pp3Sign;
 reg        pp4Sign;
+reg        ppValid;
+reg        pp1Valid;
+reg        pp2Valid;
+reg        pp3Valid;
+reg        pp4Valid;
 
 always @(posedge clk or negedge resetn) begin 
     if (~resetn) begin 
@@ -63,7 +73,7 @@ always @(posedge clk or negedge resetn) begin
         pp1Sign        <= 1'b0;
         pp2Sign        <= 1'b0;
         pp3Sign        <= 1'b0;
-        pp4Sign        <= 1'b0;
+        oDone          <= 1'b0;
     end else begin 
         ppExp          <= wExp;
         pp1Exp         <= ppExp;
@@ -74,6 +84,12 @@ always @(posedge clk or negedge resetn) begin
         pp2Sign        <= pp1Sign;
         pp3Sign        <= pp2Sign;
         pp4Sign        <= pp3Sign;
+        ppValid        <= iValid;
+        pp1Valid       <= ppValid;
+        pp2Valid       <= pp1Valid;
+        pp3Valid       <= pp2Valid;
+        pp4Valid       <= pp3Valid;
+        oDone          <= pp4Valid;
     end 
 end 
 
@@ -89,7 +105,7 @@ always @(posedge clk or negedge resetn) begin
     if (~resetn) begin 
          oZ <= 32'b0;
     end else begin 
-         oZ <= {pp4Sign, wRF_Exp, wRF_Frac};
+         oZ    <= {pp4Sign, wRF_Exp, wRF_Frac};
     end 
 end 
 
@@ -113,12 +129,12 @@ reg  [7:0]  oExp;
 reg         oOverflow;
 always @(iFrac or iExp) begin 
     if (iFrac[47]==1'b1) begin
-        oFrac = iFrac[46:24]; //always ignore the low 24bits.
-        {oOverflow, oExp}=iExp + 1;
+        oFrac             = iFrac[46:24]; //always ignore the low 24bits.
+        {oOverflow, oExp} = iExp + 1;
     end else begin 
-        oFrac = iFrac[45:23];
-        oExp  = iExp;
-        oOverflow = 1'b0;
+        oFrac             = iFrac[45:23];
+        oExp              = iExp;
+        oOverflow         = 1'b0;
     end
 end 
 

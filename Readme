@@ -20,5 +20,5 @@
    3.b Float point multiply operation 
        Status: RTL is done and verified and bugs are fixed (May.28.2014). Pipelined is achieved. 
    3.c Float point divide operation 
-       Status: RTL is not done and not verified. 
+       Status: RTL is done (May.30.2014) and not verified. 
        
