@@ -1,5 +1,5 @@
 VCS=/proj/cadtools/bin/vcs
-SRC=float_divide.v float_multiply.v multiplexor.v test_fdiv.v adder.v rhombus.v
+SRC=float_divide.v float_multiply.v multiplexor.v test_fdiv.v adder.v rhombus.v fifo.v
 TGT=simv
 VERICOM=/proj/cadtools/bin/vericom
 VERDI=/proj/cadtools/bin/verdi

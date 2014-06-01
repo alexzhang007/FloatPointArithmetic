@@ -4,6 +4,7 @@
 //              Bug : The significand of 23 bits needs to be further improved.
 //              Fix Bug4 :FP_control was stuck in the S_IDLE when multiplier FP_A process only one time.
 //              Fix Bug5 :The result of float point division is uncorrect 
+//              Fix Bug6 :Float point division needs to be improved in the throughput
 module float_point_divide(
 clk,
 resetn,
@@ -58,6 +59,8 @@ wire        wDoneFP_B;
 wire        wDone;
 wire [31:0] wNormal;
 wire        wNormalOverflow;
+wire [31:0] wFifoFP_A_Data;
+wire [31:0] wFifoFP_B_Data;
 
 
 always @(posedge clk or negedge resetn) begin 
@@ -83,7 +86,7 @@ always @(posedge clk or negedge resetn) begin
         //Retiming at the input of each Mux instread of at the output of each Mux
         ppMuxA_iA  <= ppA;
         pp2MuxA_iA <= ppMuxA_iA;
-        ppMuxA_iB  <= wA_X_LUT;
+        ppMuxA_iB  <= wFifoFP_A_Data;
         pp2MuxA_iB <= ppMuxA_iB;
 
         ppMuxBC_iA  <= wTaylor;
@@ -93,7 +96,7 @@ always @(posedge clk or negedge resetn) begin
 
         ppMuxD_iA   <= ppB;
         pp2MuxD_iA  <= ppMuxD_iA;
-        ppMuxD_iB   <= wB_X_LUT;
+        ppMuxD_iB   <= wFifoFP_B_Data;
         pp2MuxD_iB  <= ppMuxD_iB;
     end 
 end 
@@ -148,6 +151,17 @@ float_point_multiply FP_A(
   .oZ(wA_X_LUT)
 );
 
+fifo #(.DSIZE(32), .ASIZE(4)) fifoFP_A(
+  .wclk(clk),
+  .wrst_n(resetn),
+  .rclk(clk),
+  .rrst_n(resetn),
+  .wr(wDoneFP_A),
+  .wdata(wA_X_LUT),
+  .rd(wValidFP_A&iSelA | wDone),
+  .rdata(wFifoFP_A_Data) 
+);
+ 
 float_point_multiply FP_B(
   .clk(clk),
   .resetn(resetn),
@@ -158,6 +172,16 @@ float_point_multiply FP_B(
   .oZ(wB_X_LUT)
 );
 
+fifo #(.DSIZE(32), .ASIZE(4)) fifoFP_B(
+  .wclk(clk),
+  .wrst_n(resetn),
+  .rclk(clk),
+  .rrst_n(resetn),
+  .wr(wDoneFP_B),
+  .wdata(wB_X_LUT),
+  .rd(wValidFP_A&iSelB ),
+  .rdata(wFifoFP_B_Data)
+);
 control FP_control (
   .clk(clk),
   .resetn(resetn),

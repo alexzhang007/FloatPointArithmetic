@@ -4,3 +4,4 @@
 /proj/blza0/wa/alzhang/proj/eff_verilog/float_arithmetic/adder.v
 /proj/blza0/wa/alzhang/proj/eff_verilog/float_arithmetic/rhombus.v
 /proj/blza0/wa/alzhang/proj/eff_verilog/float_arithmetic/multiplexor.v
+/proj/blza0/wa/alzhang/proj/eff_verilog/float_arithmetic/fifo.v
