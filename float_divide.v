@@ -3,6 +3,7 @@
 //Description : Float point signed division implemetation with Taylor Series: a/b
 //              Bug : The significand of 23 bits needs to be further improved.
 //              Fix Bug4 :FP_control was stuck in the S_IDLE when multiplier FP_A process only one time.
+//              Fix Bug5 :The result of float point division is uncorrect 
 module float_point_divide(
 clk,
 resetn,
@@ -25,6 +26,18 @@ reg  [31:0] oZ;
 reg         oDone;
 reg  [31:0] ppA;
 reg  [31:0] ppB;
+reg  [31:0] ppMuxA_iA   ;
+reg  [31:0] pp2MuxA_iA  ;
+reg  [31:0] ppMuxA_iB   ;
+reg  [31:0] pp2MuxA_iB  ;
+reg  [31:0] ppMuxBC_iA  ;
+reg  [31:0] pp2MuxBC_iA ;
+reg  [31:0] ppMuxBC_iB  ;
+reg  [31:0] pp2MuxBC_iB ;
+reg  [31:0] ppMuxD_iA; 
+reg  [31:0] pp2MuxD_iA; 
+reg  [31:0] ppMuxD_iB; 
+reg  [31:0] pp2MuxD_iB; 
 wire [31:0] wA_X_LUT;
 wire        wSelA;
 wire [31:0] wMuxAOut;
@@ -32,49 +45,89 @@ wire [31:0] wTaylor;
 wire [31:0] wComplement;
 wire        wSelB;
 wire [31:0] wMuxBOut;
+wire        wSelC;
 wire [31:0] wMuxCOut;
 wire        wSelC;
+wire        wSelD;
+wire [31:0] wMuxDOut;
 wire [31:0] wB_X_LUT;
 wire        wValidFP_A;
 wire        wValidFP_B;
 wire        wDoneFP_A;
 wire        wDoneFP_B;
 wire        wDone;
+wire [31:0] wNormal;
+wire        wNormalOverflow;
 
 
 always @(posedge clk or negedge resetn) begin 
     if (~resetn) begin 
-        ppA <= 32'b0;
-        ppB <= 32'b0;
+        ppA         <= 32'b0;
+        ppB         <= 32'b0;
+        ppMuxA_iA   <= 32'b0;
+        pp2MuxA_iA  <= 32'b0;
+        ppMuxA_iB   <= 32'b0;
+        pp2MuxA_iB  <= 32'b0;
+        ppMuxBC_iA  <= 32'b0;
+        pp2MuxBC_iA <= 32'b0;
+        ppMuxBC_iB  <= 32'b0;
+        pp2MuxBC_iB <= 32'b0;
+        ppMuxD_iA   <= 32'b0;
+        pp2MuxD_iA  <= 32'b0;
+        ppMuxD_iB   <= 32'b0;
+        pp2MuxD_iB  <= 32'b0;
     end else begin 
-        ppA <= {iA[31]^iB[31], iA[30:23]-iB[30:23]-8'd127, iA[22:0] }; //FIXME, need the ExpSub module to record the overflow.
-        ppB <= {1'b0, 8'b0111_1111, 1'b1, iB[22:1]};                   //0.5<= iA <1.0
+        ppA <= {iA[31]^iB[31], iA[30:23]-iB[30:23]+8'd127, iA[22:0] }; //FIXME, need the ExpSub module to record the overflow.
+        ppB <= {1'b0, 8'b0111_1110, iB[22:0]};                   //0.5<= iA <1.0
+
+        //Retiming at the input of each Mux instread of at the output of each Mux
+        ppMuxA_iA  <= ppA;
+        pp2MuxA_iA <= ppMuxA_iA;
+        ppMuxA_iB  <= wA_X_LUT;
+        pp2MuxA_iB <= ppMuxA_iB;
+
+        ppMuxBC_iA  <= wTaylor;
+        pp2MuxBC_iA <= ppMuxBC_iA;
+        ppMuxBC_iB  <= wComplement;
+        pp2MuxBC_iB <= ppMuxBC_iB;
+
+        ppMuxD_iA   <= ppB;
+        pp2MuxD_iA  <= ppMuxD_iA;
+        ppMuxD_iB   <= wB_X_LUT;
+        pp2MuxD_iB  <= ppMuxD_iB;
     end 
 end 
 
 mux_2 #(.DATA_WIDTH(32)) muxTwoA(
-  .iZeroBranch(ppA),
-  .iOneBranch(wA_X_LUT),
+  .iZeroBranch(pp2MuxA_iA),
+  .iOneBranch(pp2MuxA_iB),
   .iSel(wSelA),
   .oMux(wMuxAOut)
 );
 
 mux_2 #(.DATA_WIDTH(32)) muxTwoB(
-  .iZeroBranch(wTaylor),
-  .iOneBranch(wComplement),
+  .iZeroBranch(pp2MuxBC_iA),
+  .iOneBranch(pp2MuxBC_iB),
   .iSel(wSelB),
   .oMux(wMuxBOut)
 );
 
 mux_2 #(.DATA_WIDTH(32)) muxTwoC(
-  .iZeroBranch(wTaylor),
-  .iOneBranch(wComplement),
+  .iZeroBranch(pp2MuxBC_iA),
+  .iOneBranch(pp2MuxBC_iB),
   .iSel(wSelC),
   .oMux(wMuxCOut)
 );
 
+mux_2 #(.DATA_WIDTH(32)) muxTwoD(
+  .iZeroBranch(pp2MuxD_iA),
+  .iOneBranch(pp2MuxD_iB),
+  .iSel(wSelD),
+  .oMux(wMuxDOut)
+);
+
 lut_1PlusX_1AddXX_1AddXXXX ROM(
-  .iB1_8(ppB[21:13]),
+  .iB1_8(ppB[22:15]),
   .oTaylor(wTaylor)
 );
 
@@ -83,6 +136,8 @@ complement comp_2(
   .iCompFrac(wB_X_LUT[22:0]),
   .oComplement(wComplement)
 );
+
+
 float_point_multiply FP_A(
   .clk(clk),
   .resetn(resetn),
@@ -96,8 +151,8 @@ float_point_multiply FP_A(
 float_point_multiply FP_B(
   .clk(clk),
   .resetn(resetn),
-  .iA(ppB),
-  .iB(wMuxCOut),
+  .iA(wMuxCOut),
+  .iB(wMuxDOut),
   .iValid(wValidFP_B),
   .oDone(wDoneFP_B),
   .oZ(wB_X_LUT)
@@ -112,24 +167,62 @@ control FP_control (
   .oSelA(wSelA),
   .oSelB(wSelB),
   .oSelC(wSelC),
+  .oSelD(wSelD),
   .oValidFP_A(wValidFP_A),
   .oValidFP_B(wValidFP_B),
   .oDone(wDone)
 );
 
-
+normalizer FP_normal (
+  .iNormalSign(pp2MuxA_iB[31]),
+  .iNormalExp(pp2MuxA_iB[30:23]),
+  .iNormalFrac(pp2MuxA_iB[22:0]),
+  .oNormal(wNormal),
+  .oOverflow(wNormalOverflow)
+);
 always @(posedge clk or negedge resetn) begin 
     if(~resetn) begin 
-        oZ <= 32'b0;
+        oZ    <= 32'b0;
+        oDone <= 1'b0;
     end else begin
-        if (wDone) 
-           oZ <= wA_X_LUT;
-        else 
-           oZ <= 32'b0;
+        if (wDone) begin
+           oZ    <= wNormal;
+           oDone <= wDone;
+        end else  begin
+           oZ    <= 32'b0;
+           oDone <= 1'b0;
+        end
     end 
 end 
 
 endmodule //float_point_divide
+
+module normalizer(
+iNormalSign,
+iNormalExp,
+iNormalFrac,
+oNormal,
+oOverflow
+);
+input  iNormalSign;
+input  iNormalExp;
+input  iNormalFrac;
+output oNormal;
+output oOverflow;
+
+wire   iNormalSign;
+wire [ 7:0] iNormalExp;
+wire [22:0] iNormalFrac;
+reg  [31:0] oNormal;
+reg         oOverflow;
+
+always @(*) begin 
+    oNormal   = {iNormalSign, iNormalExp-1, iNormalFrac};
+    oOverflow = iNormalSign ^oNormal[31];
+end 
+
+endmodule 
+
 
 module control (
 clk,
@@ -140,6 +233,7 @@ iDoneFP_B,
 oSelA,
 oSelB,
 oSelC,
+oSelD,
 oValidFP_A,
 oValidFP_B,
 oDone
@@ -152,6 +246,7 @@ input iDoneFP_B;
 output oSelA;
 output oSelB;
 output oSelC;
+output oSelD;
 output oValidFP_A;
 output oValidFP_B;
 output oDone;
@@ -159,6 +254,7 @@ output oDone;
 reg  oSelA;
 reg  oSelB;
 reg  oSelC;
+reg  oSelD;
 reg  oValidFP_A;
 reg  oValidFP_B;
 reg  oDone;
@@ -171,7 +267,7 @@ parameter S_IDLE   = 3'b000;
 parameter S_PP_ONE = 3'b001;
 parameter S_PP_TWO = 3'b010;
 parameter S_PP_THR = 3'b011;
-parameter S_DONE   = 3'b100;
+parameter S_DONE   = 3'b111;
 parameter TIMER    = 4;
 
 always @(posedge clk or negedge resetn) begin 
@@ -191,7 +287,7 @@ always @(*) begin
                          next_state = S_PP_TWO;
                      else if (iDoneFP_A & iDoneFP_B && counter ==4'b10)
                          next_state = S_PP_THR;
-                     else if ((iDoneFP_A | iDoneFP_B) && counter ==4'b11)
+                     else if (iDoneFP_A && counter ==4'b11)
                          next_state = S_DONE;
                      else 
                          next_state = S_IDLE;
@@ -216,6 +312,7 @@ always @(posedge clk or negedge resetn) begin
         oSelA      <= 1'b0;
         oSelB      <= 1'b0;
         oSelC      <= 1'b0;
+        oSelD      <= 1'b0;
         oValidFP_A <= 1'b0;
         oValidFP_B <= 1'b0;
         oDone      <= 1'b0;
@@ -231,6 +328,7 @@ always @(posedge clk or negedge resetn) begin
                          oSelA      <= 1'b0;
                          oSelB      <= 1'b0;
                          oSelC      <= 1'b0;
+                         oSelD      <= 1'b0;
                          oValidFP_A <= 1'b0;
                          oValidFP_B <= 1'b0;
                          oDone      <= 1'b0;
@@ -239,6 +337,7 @@ always @(posedge clk or negedge resetn) begin
                          oSelA      <= 1'b0;
                          oSelB      <= 1'b0;
                          oSelC      <= 1'b0;
+                         oSelD      <= 1'b0;
                          oValidFP_A <= 1'b1;
                          oValidFP_B <= 1'b1;
                          oDone      <= 1'b0;
@@ -247,6 +346,7 @@ always @(posedge clk or negedge resetn) begin
                          oSelA      <= 1'b1;
                          oSelB      <= 1'b1;
                          oSelC      <= 1'b1;
+                         oSelD      <= 1'b1;
                          oValidFP_A <= 1'b1;
                          oValidFP_B <= 1'b1;
                          oDone      <= 1'b0;
@@ -255,6 +355,7 @@ always @(posedge clk or negedge resetn) begin
                          oSelA      <= 1'b1;
                          oSelB      <= 1'b1;
                          oSelC      <= 1'b0;
+                         oSelD      <= 1'b0;
                          oValidFP_A <= 1'b1;
                          oValidFP_B <= 1'b0;
                          oDone      <= 1'b0;
@@ -263,6 +364,7 @@ always @(posedge clk or negedge resetn) begin
                          oSelA      <= 1'b0;
                          oSelB      <= 1'b0;
                          oSelC      <= 1'b0;
+                         oSelD      <= 1'b0;
                          oValidFP_A <= 1'b0;
                          oValidFP_B <= 1'b0;
                          oDone      <= 1'b1;
@@ -286,12 +388,14 @@ wire [8:0]  iCompExp;
 wire [22:0] iCompFrac;
 reg  [31:0] oComplement;
 
+//Fix the complement algorithm, need further verify
 always @(iCompExp or iCompFrac) begin 
-    oComplement =  {iCompExp, ~iCompFrac+23'b1};
+    oComplement =  {iCompExp[8:1], ~iCompExp[0], (~iCompFrac+23'b1)>>1};
 end 
 endmodule //complement
 
 // The LUT is generated via float_point_binary3.c
+//Module name is followed by (1-X)(1+X^2)(1+X^4)
 module lut_1PlusX_1AddXX_1AddXXXX(
 iB1_8,
 oTaylor
