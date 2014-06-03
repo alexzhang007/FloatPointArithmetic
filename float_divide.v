@@ -4,11 +4,12 @@
 //              Bug : The significand of 23 bits needs to be further improved.
 //              Fix Bug4 :FP_control was stuck in the S_IDLE when multiplier FP_A process only one time.
 //              Fix Bug5 :The result of float point division is uncorrect 
-//              Fix Bug6 :Float point division needs to be improved in the throughput
+//              Fix Bug6 :Float point division needs to be improved in the throughput to 4 (maximum is 7)
 module float_point_divide(
 clk,
 resetn,
 iValid,
+iMask,
 iA,
 iB,
 oDone,
@@ -17,12 +18,14 @@ oZ
 input clk;
 input resetn;
 input iValid;
+input iMask;
 input iA;
 input iB;
 output oDone;
 output oZ;
 wire [31:0] iA;
 wire [31:0] iB;
+wire [ 3:0] iMask;
 reg  [31:0] oZ;
 reg         oDone;
 reg  [31:0] ppA;
@@ -48,7 +51,6 @@ wire        wSelB;
 wire [31:0] wMuxBOut;
 wire        wSelC;
 wire [31:0] wMuxCOut;
-wire        wSelC;
 wire        wSelD;
 wire [31:0] wMuxDOut;
 wire [31:0] wB_X_LUT;
@@ -103,7 +105,7 @@ end
 
 mux_2 #(.DATA_WIDTH(32)) muxTwoA(
   .iZeroBranch(pp2MuxA_iA),
-  .iOneBranch(pp2MuxA_iB),
+  .iOneBranch(ppMuxA_iB),
   .iSel(wSelA),
   .oMux(wMuxAOut)
 );
@@ -124,12 +126,12 @@ mux_2 #(.DATA_WIDTH(32)) muxTwoC(
 
 mux_2 #(.DATA_WIDTH(32)) muxTwoD(
   .iZeroBranch(pp2MuxD_iA),
-  .iOneBranch(pp2MuxD_iB),
+  .iOneBranch(ppMuxD_iB),
   .iSel(wSelD),
   .oMux(wMuxDOut)
 );
 
-lut_1PlusX_1AddXX_1AddXXXX ROM(
+lut_1PlusX_1AddXX_1AddXXXX lutROM(
   .iB1_8(ppB[22:15]),
   .oTaylor(wTaylor)
 );
@@ -141,7 +143,7 @@ complement comp_2(
 );
 
 
-float_point_multiply FP_A(
+float_point_multiply mulFP_A(
   .clk(clk),
   .resetn(resetn),
   .iA(wMuxAOut),
@@ -158,11 +160,11 @@ fifo #(.DSIZE(32), .ASIZE(4)) fifoFP_A(
   .rrst_n(resetn),
   .wr(wDoneFP_A),
   .wdata(wA_X_LUT),
-  .rd(wValidFP_A&iSelA | wDone),
+  .rd(wValidFP_A&wSelA | wDone),
   .rdata(wFifoFP_A_Data) 
 );
  
-float_point_multiply FP_B(
+float_point_multiply mulFP_B(
   .clk(clk),
   .resetn(resetn),
   .iA(wMuxCOut),
@@ -179,13 +181,14 @@ fifo #(.DSIZE(32), .ASIZE(4)) fifoFP_B(
   .rrst_n(resetn),
   .wr(wDoneFP_B),
   .wdata(wB_X_LUT),
-  .rd(wValidFP_A&iSelB ),
+  .rd(wValidFP_A&wSelB ),
   .rdata(wFifoFP_B_Data)
 );
 control FP_control (
   .clk(clk),
   .resetn(resetn),
   .iValid(iValid),
+  .iMask(iMask),
   .iDoneFP_A(wDoneFP_A),
   .iDoneFP_B(wDoneFP_B),
   .oSelA(wSelA),
@@ -234,7 +237,7 @@ input  iNormalFrac;
 output oNormal;
 output oOverflow;
 
-wire   iNormalSign;
+wire        iNormalSign;
 wire [ 7:0] iNormalExp;
 wire [22:0] iNormalFrac;
 reg  [31:0] oNormal;
@@ -252,6 +255,7 @@ module control (
 clk,
 resetn,
 iValid,
+iMask,
 iDoneFP_A,
 iDoneFP_B,
 oSelA,
@@ -265,6 +269,7 @@ oDone
 input clk;
 input resetn;
 input iValid;
+input iMask;
 input iDoneFP_A;
 input iDoneFP_B;
 output oSelA;
@@ -275,6 +280,8 @@ output oValidFP_A;
 output oValidFP_B;
 output oDone;
 
+wire [3:0] iMask;
+
 reg  oSelA;
 reg  oSelB;
 reg  oSelC;
@@ -283,51 +290,110 @@ reg  oValidFP_A;
 reg  oValidFP_B;
 reg  oDone;
 
-reg [2:0]  state;
-reg [2:0]  next_state;
-reg [3:0]  counter;
-
-parameter S_IDLE   = 3'b000;
-parameter S_PP_ONE = 3'b001;
-parameter S_PP_TWO = 3'b010;
-parameter S_PP_THR = 3'b011;
-parameter S_DONE   = 3'b111;
-parameter TIMER    = 4;
+reg [3:0]  state;
+reg [3:0]  next_state;
+reg [3:0]  stages; //one-hot encode to indicate the stages
+//Bug6: Extend each state to four to support 4 float point division. 
+parameter S_IDLE     = 4'b0000; //0
+parameter S_PP_ONE   = 4'b0001; //1
+parameter S_PP_TWO   = 4'b0100; //4
+parameter S_PP_TWO_1 = 4'b0101; //5
+parameter S_PP_TWO_2 = 4'b0110; //6
+parameter S_PP_TWO_3 = 4'b0111; //7
+parameter S_IDLE_TWO = 4'b1101; //13
+parameter S_PP_THR   = 4'b1000; //8
+parameter S_PP_THR_1 = 4'b1001; //9
+parameter S_PP_THR_2 = 4'b1010; //10
+parameter S_PP_THR_3 = 4'b1011; //11
+parameter S_IDLE_THR = 4'b1110; //14
+parameter S_DONE     = 4'b0010; //2
+parameter S_DONE_1   = 4'b0011; //3
+parameter S_DONE_2   = 4'b1100; //12
+parameter S_DONE_3   = 4'b1111; //15
 
 always @(posedge clk or negedge resetn) begin 
-    if (~resetn) 
-       state <= S_IDLE;
-    else 
+    if (~resetn) begin 
+        stages     <= 4'b0;
+    end else begin 
+        stages     <= iMask;
+    end
+
+end 
+
+always @(posedge clk or negedge resetn) begin 
+    if (~resetn) begin
+       state         <= S_IDLE;
+    end  else 
        state <= next_state;
 end
 
 always @(*) begin 
     next_state = state;
     case (state) 
-        S_IDLE : begin 
-                     if (iValid )
-                         next_state = S_PP_ONE;
-                     else if (iDoneFP_A & iDoneFP_B && counter ==4'b1)
-                         next_state = S_PP_TWO;
-                     else if (iDoneFP_A & iDoneFP_B && counter ==4'b10)
-                         next_state = S_PP_THR;
-                     else if (iDoneFP_A && counter ==4'b11)
-                         next_state = S_DONE;
-                     else 
-                         next_state = S_IDLE;
-                 end 
-         S_PP_ONE: begin 
-                      next_state = S_IDLE;
-                   end 
-         S_PP_TWO: begin 
-                      next_state = S_IDLE;
-                   end 
-         S_PP_THR: begin 
-                      next_state = S_IDLE;
-                   end 
-         S_DONE  : begin
-                      next_state = S_IDLE;
-                   end
+         S_IDLE     : begin 
+                          if (iValid ) begin
+                              next_state    = S_PP_ONE;
+                          end else if (iDoneFP_A & iDoneFP_B ) begin
+                              next_state    = S_PP_TWO;
+                          end else begin
+                              next_state    = S_IDLE;
+                          end
+                      end 
+         S_PP_ONE   : begin 
+                          if (iValid) begin 
+                             next_state = S_PP_ONE;
+                          end else begin
+                             next_state = S_IDLE;
+                          end 
+                      end 
+         S_PP_TWO   : begin
+                          next_state = S_PP_TWO_1;
+                      end 
+         S_PP_TWO_1 : begin
+                          next_state = S_PP_TWO_2;
+                      end 
+         S_PP_TWO_2 : begin
+                          next_state = S_PP_TWO_3;
+                      end 
+         S_PP_TWO_3 : begin
+                          next_state = S_IDLE_TWO;
+                      end 
+         S_IDLE_TWO : begin 
+                          if (iDoneFP_A & iDoneFP_B ) 
+                              next_state    = S_PP_THR;
+                          else 
+                              next_state    = S_IDLE_TWO;
+                      end
+         S_PP_THR   : begin 
+                          next_state = S_PP_THR_1;
+                      end 
+         S_PP_THR_1 : begin 
+                          next_state = S_PP_THR_2;
+                      end 
+         S_PP_THR_2 : begin 
+                          next_state = S_PP_THR_3;
+                      end 
+         S_PP_THR_3 : begin 
+                          next_state = S_IDLE_THR;
+                      end 
+         S_IDLE_THR : begin 
+                          if (iDoneFP_A ) 
+                              next_state    = S_DONE;
+                          else 
+                              next_state    = S_IDLE_THR;
+                      end
+         S_DONE     : begin
+                          next_state = S_DONE_1;
+                      end
+         S_DONE_1   : begin
+                          next_state = S_DONE_2;
+                      end
+         S_DONE_2   : begin
+                          next_state = S_DONE_3;
+                      end
+         S_DONE_3   : begin
+                          next_state = S_IDLE;
+                      end
         default : next_state <= S_IDLE;
     endcase 
 end 
@@ -340,63 +406,137 @@ always @(posedge clk or negedge resetn) begin
         oValidFP_A <= 1'b0;
         oValidFP_B <= 1'b0;
         oDone      <= 1'b0;
-        counter    <= 4'b0;
     end else begin 
         //counter is to forward the state machine from one pipeline stage to the next
-        if (iValid )
-             counter <=4'b0;
-        else if (oValidFP_A | oValidFP_B)
-             counter <= counter+4'b1; 
         case (state) 
-            S_IDLE : begin 
-                         oSelA      <= 1'b0;
-                         oSelB      <= 1'b0;
-                         oSelC      <= 1'b0;
-                         oSelD      <= 1'b0;
-                         oValidFP_A <= 1'b0;
-                         oValidFP_B <= 1'b0;
-                         oDone      <= 1'b0;
-                     end 
-            S_PP_ONE: begin 
-                         oSelA      <= 1'b0;
-                         oSelB      <= 1'b0;
-                         oSelC      <= 1'b0;
-                         oSelD      <= 1'b0;
-                         oValidFP_A <= 1'b1;
-                         oValidFP_B <= 1'b1;
-                         oDone      <= 1'b0;
-                      end
-            S_PP_TWO: begin 
-                         oSelA      <= 1'b1;
-                         oSelB      <= 1'b1;
-                         oSelC      <= 1'b1;
-                         oSelD      <= 1'b1;
-                         oValidFP_A <= 1'b1;
-                         oValidFP_B <= 1'b1;
-                         oDone      <= 1'b0;
-                      end
-            S_PP_THR: begin 
-                         oSelA      <= 1'b1;
-                         oSelB      <= 1'b1;
-                         oSelC      <= 1'b0;
-                         oSelD      <= 1'b0;
-                         oValidFP_A <= 1'b1;
-                         oValidFP_B <= 1'b0;
-                         oDone      <= 1'b0;
-                      end
-            S_DONE :  begin 
-                         oSelA      <= 1'b0;
-                         oSelB      <= 1'b0;
-                         oSelC      <= 1'b0;
-                         oSelD      <= 1'b0;
-                         oValidFP_A <= 1'b0;
-                         oValidFP_B <= 1'b0;
-                         oDone      <= 1'b1;
-                      end
+            S_IDLE    : begin 
+                            OP_Idle;
+                        end 
+            S_PP_ONE  : begin
+                            OP_PipelineOne; 
+                        end
+            S_PP_TWO  : begin 
+                            OP_PipelineTwo;
+                        end
+            S_PP_TWO_1: begin 
+                            if (stages[1]) begin 
+                                OP_PipelineTwo;
+                            end else begin 
+                                OP_Idle;
+                            end 
+                        end
+            S_PP_TWO_2: begin 
+                            if (stages[2]) begin 
+                                OP_PipelineTwo;
+                            end else begin 
+                                OP_Idle;
+                            end 
+                        end
+            S_PP_TWO_3: begin 
+                            if (stages[3]) begin 
+                                OP_PipelineTwo;
+                            end else begin 
+                                OP_Idle;
+                            end 
+                        end
+            S_IDLE_TWO: begin 
+                            OP_Idle;
+                        end
+            S_PP_THR  : begin 
+                            OP_PipelineThree;
+                        end
+            S_PP_THR_1: begin
+                            if (stages[1]) 
+                                OP_PipelineThree;
+                            else 
+                                OP_Idle;
+                        end
+            S_PP_THR_2: begin
+                            if (stages[2]) 
+                                OP_PipelineThree;
+                            else 
+                                OP_Idle;
+                        end
+            S_PP_THR_3: begin
+                            if (stages[3]) 
+                                OP_PipelineThree;
+                            else 
+                                OP_Idle;
+                        end
+            S_IDLE_THR: begin 
+                            OP_Idle;
+                        end
+            S_DONE    : begin
+                            OP_PipelineDone; 
+                        end
+            S_DONE_1  : begin
+                            if (stages[1])
+                                OP_PipelineDone; 
+                            else 
+                                OP_Idle;
+                        end
+            S_DONE_2  : begin
+                            if (stages[2])
+                                OP_PipelineDone; 
+                            else 
+                                OP_Idle;
+                        end
+            S_DONE_3  : begin
+                            if (stages[3])
+                                OP_PipelineDone; 
+                            else 
+                                OP_Idle;
+                        end
         endcase
     end 
 
 end  
+
+task  OP_Idle;
+     oSelA      <= 1'b0;
+     oSelB      <= 1'b0;
+     oSelC      <= 1'b0;
+     oSelD      <= 1'b0;
+     oValidFP_A <= 1'b0;
+     oValidFP_B <= 1'b0;
+     oDone      <= 1'b0;
+endtask
+task OP_PipelineOne;
+    oSelA      <= 1'b0;
+    oSelB      <= 1'b0;
+    oSelC      <= 1'b0;
+    oSelD      <= 1'b0;
+    oValidFP_A <= 1'b1;
+    oValidFP_B <= 1'b1;
+    oDone      <= 1'b0;
+endtask
+task OP_PipelineTwo;
+    oSelA      <= 1'b1;
+    oSelB      <= 1'b1;
+    oSelC      <= 1'b1;
+    oSelD      <= 1'b1;
+    oValidFP_A <= 1'b1;
+    oValidFP_B <= 1'b1;
+    oDone      <= 1'b0;
+endtask
+task OP_PipelineThree;
+    oSelA      <= 1'b1;
+    oSelB      <= 1'b1;
+    oSelC      <= 1'b0;
+    oSelD      <= 1'b0;
+    oValidFP_A <= 1'b1;
+    oValidFP_B <= 1'b0;
+    oDone      <= 1'b0;
+endtask
+task OP_PipelineDone;
+    oSelA      <= 1'b0;
+    oSelB      <= 1'b0;
+    oSelC      <= 1'b0;
+    oSelD      <= 1'b0;
+    oValidFP_A <= 1'b0;
+    oValidFP_B <= 1'b0;
+    oDone      <= 1'b1;
+endtask
 
 endmodule 
 
