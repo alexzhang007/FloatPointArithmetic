@@ -22,3 +22,5 @@
    3.c Float point divide operation 
        Status: RTL is done (May.30.2014) and not verified(Jun.3.2014). 
        
+4. Architectures
+   ![alt FloatPoint Multiply](./float_point_multiply.jpg)
